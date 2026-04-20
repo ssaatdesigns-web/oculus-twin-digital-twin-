@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OculusTwin — Eye Operation Digital Twin System</title>
+<meta name="description" content="Virtual simulation digital twin for ocular surgery"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#04070d;--panel:#080e18;--panel2:#0c1422;--border:#0f2035;--border2:#162840;--cyan:#00e5ff;--cyan2:#00b4cc;--teal:#00ffc8;--amber:#ffb800;--red:#ff3355;--green:#00e87a;--text:#d4e8f5;--muted:#4a7090;--font-mono:'Space Mono',monospace;--font-ui:'Syne',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:12px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.01) 2px,rgba(0,229,255,.01) 4px);pointer-events:none;z-index:9999}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1.2rem;background:var(--panel);border-bottom:1px solid var(--border2);flex-shrink:0;z-index:100}
+.topbar-left,.topbar-center,.topbar-right{display:flex;align-items:center;gap:1rem}
+.topbar-right{gap:1.5rem}
+.logo{font-family:var(--font-ui);font-weight:800;font-size:1.1rem;color:var(--cyan);letter-spacing:.05em;text-shadow:0 0 20px rgba(0,229,255,.5)}
+.logo span{color:var(--teal)}
+.sys-badge{font-size:.6rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;border:1px solid var(--border2);padding:.2rem .5rem;border-radius:3px}
+.sync-indicator{display:flex;align-items:center;gap:.4rem;font-size:.65rem;color:var(--teal);letter-spacing:.1em}
+.sync-dot{width:7px;height:7px;background:var(--teal);border-radius:50%;animation:syncPulse 1.2s infinite;box-shadow:0 0 8px var(--teal)}
+.top-stat{text-align:right}
+.top-stat .lbl{font-size:.55rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;display:block}
+.top-stat .val{font-size:.85rem;color:var(--cyan)}
+.main{display:grid;grid-template-columns:220px 1fr 240px;grid-template-rows:1fr 160px;gap:1px;background:var(--border);flex:1;min-height:0;overflow:hidden}
+.main>*{background:var(--bg);overflow:hidden;min-height:0}
+.left-panel{grid-row:1/3;display:flex;flex-direction:column;gap:1px;background:var(--border);overflow:hidden}
+.panel-block{background:var(--bg);padding:.8rem;overflow:hidden;flex-shrink:0}
+.panel-block.grow{flex:1;overflow:hidden}
+.panel-title{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--cyan2);margin-bottom:.7rem;display:flex;align-items:center;gap:.4rem}
+.panel-title::before{content:'//';color:var(--muted);font-size:.55rem}
+.vital{margin-bottom:.75rem}
+.vital-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.25rem}
+.vital-name{font-size:.6rem;color:var(--muted);letter-spacing:.08em}
+.vital-val{font-size:.95rem;color:var(--text);font-weight:700}
+.vital-unit{font-size:.55rem;color:var(--muted)}
+.vital-bar-bg{height:3px;background:var(--border2);border-radius:2px;overflow:hidden}
+.vital-bar{height:100%;border-radius:2px;transition:width .4s ease}
+.vital-status{font-size:.55rem;margin-top:.2rem;letter-spacing:.1em}
+.surg-btn{width:100%;padding:.5rem .6rem;background:var(--panel2);border:1px solid var(--border2);color:var(--muted);font-family:var(--font-mono);font-size:.65rem;letter-spacing:.08em;text-align:left;cursor:pointer;border-radius:4px;margin-bottom:.4rem;transition:all .2s}
+.surg-btn:hover,.surg-btn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.05);box-shadow:0 0 12px rgba(0,229,255,.1)}
+.surg-btn.active::before{content:'▶ '}
+.phase-item{display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.65rem;color:var(--muted);transition:color .3s}
+.phase-item.done{color:var(--green)}
+.phase-item.active{color:var(--cyan)}
+.phase-item.active .phase-dot{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:syncPulse 1s infinite}
+.phase-item.done .phase-dot{background:var(--green)}
+.phase-dot{width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
+.phase-num{font-size:.55rem;color:var(--muted);margin-left:auto}
+.center-stage{grid-row:1/2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.eye-wrapper{position:relative;width:320px;height:320px}
+.scan-ring{position:absolute;border-radius:50%;border:1px solid rgba(0,229,255,.08);animation:scanRotate 8s linear infinite}
+.scan-ring:nth-child(1){inset:-30px;border-color:rgba(0,229,255,.06);animation-duration:12s}
+.scan-ring:nth-child(2){inset:-50px;border-color:rgba(0,255,200,.04);animation-duration:18s;animation-direction:reverse}
+.scan-ring:nth-child(3){inset:-70px;border-color:rgba(0,229,255,.03);animation-duration:25s}
+.scan-ring::after{content:'';position:absolute;top:0;left:50%;width:4px;height:4px;background:var(--cyan);border-radius:50%;transform:translateX(-50%) translateY(-50%);box-shadow:0 0 8px var(--cyan)}
+#eyeSvg{width:100%;height:100%;position:relative;z-index:2}
+.measure-line{position:absolute;background:rgba(0,229,255,.25);pointer-events:none;z-index:5}
+.m-h{height:1px;left:10%;right:10%;top:50%}
+.m-v{width:1px;left:50%;top:10%;bottom:10%}
+.measure-label{position:absolute;font-family:var(--font-mono);font-size:.6rem;color:var(--cyan);z-index:6;pointer-events:none;letter-spacing:.05em}
+.laser-beam{position:absolute;width:2px;background:linear-gradient(to bottom,transparent,var(--cyan),rgba(0,229,255,.3));transform-origin:top center;opacity:0;box-shadow:0 0 8px var(--cyan),0 0 20px var(--cyan);transition:opacity .3s}
+.stage-info{position:absolute;bottom:1rem;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap}
+.phase-name{font-family:var(--font-ui);font-size:.9rem;font-weight:700;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;text-shadow:0 0 20px rgba(0,229,255,.5)}
+.phase-desc{font-size:.6rem;color:var(--muted);margin-top:.2rem;letter-spacing:.08em}
+.phase-progress-wrap{position:absolute;top:1rem;left:50%;transform:translateX(-50%);width:60%;display:flex;flex-direction:column;gap:.3rem;align-items:center}
+.progress-bar-bg{width:100%;height:2px;background:var(--border2);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--teal));border-radius:2px;transition:width .5s ease;box-shadow:0 0 8px var(--cyan)}
+.progress-label{font-size:.6rem;color:var(--muted);letter-spacing:.1em}
+.controls-bar{grid-column:2/3;grid-row:2/3;display:flex;flex-direction:column;gap:.5rem;padding:.75rem 1rem;justify-content:center}
+.ctrl-row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.ctrl-btn{padding:.5rem 1.1rem;border:1px solid var(--border2);background:var(--panel2);color:var(--text);font-family:var(--font-mono);font-size:.68rem;letter-spacing:.1em;cursor:pointer;border-radius:4px;text-transform:uppercase;transition:all .2s}
+.ctrl-btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.05)}
+.ctrl-btn.primary{border-color:var(--cyan);color:var(--bg);background:var(--cyan);font-weight:700;box-shadow:0 0 20px rgba(0,229,255,.3)}
+.ctrl-btn.primary:hover{background:var(--teal);border-color:var(--teal)}
+.ctrl-btn.danger{border-color:var(--red);color:var(--red)}
+.ctrl-btn.danger:hover{background:rgba(255,51,85,.1)}
+.ctrl-btn:disabled{opacity:.3;cursor:not-allowed}
+.ctrl-label{font-size:.6rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-right:.5rem}
+.speed-btns{display:flex;gap:.25rem}
+.speed-btn{padding:.3rem .5rem;border:1px solid var(--border2);background:var(--panel2);color:var(--muted);font-family:var(--font-mono);font-size:.6rem;cursor:pointer;border-radius:3px;transition:all .15s}
+.speed-btn.active{border-color:var(--amber);color:var(--amber);background:rgba(255,184,0,.08)}
+.right-panel{grid-row:1/3;display:flex;flex-direction:column;gap:1px;background:var(--border);overflow:hidden}
+.event-log{flex:1;overflow-y:auto;padding:0;min-height:0}
+.event-log::-webkit-scrollbar{width:3px}
+.event-log::-webkit-scrollbar-track{background:transparent}
+.event-log::-webkit-scrollbar-thumb{background:var(--border2)}
+.log-entry{padding:.4rem .8rem;border-bottom:1px solid var(--border);display:flex;gap:.5rem;animation:logFade .3s ease}
+.log-time{font-size:.55rem;color:var(--muted);flex-shrink:0;width:44px}
+.log-text{font-size:.6rem;color:var(--muted);line-height:1.5}
+.log-entry.info .log-text{color:var(--text)}
+.log-entry.warn .log-text{color:var(--amber)}
+.log-entry.alert .log-text{color:var(--red)}
+.log-entry.ok .log-text{color:var(--green)}
+.log-entry.sync .log-text{color:var(--cyan)}
+.alert-box{padding:.6rem .8rem;border-bottom:1px solid var(--border);display:none;gap:.5rem;align-items:flex-start}
+.alert-box.visible{display:flex}
+.alert-box.warn{background:rgba(255,184,0,.06);border-left:2px solid var(--amber)}
+.alert-box.crit{background:rgba(255,51,85,.06);border-left:2px solid var(--red);animation:critPulse 1s infinite}
+.alert-icon{font-size:.8rem;flex-shrink:0}
+.alert-title{font-size:.65rem;font-weight:700;letter-spacing:.08em}
+.alert-msg{font-size:.6rem;color:var(--muted);line-height:1.5}
+.alert-box.warn .alert-title{color:var(--amber)}
+.alert-box.crit .alert-title{color:var(--red)}
+.waveform-wrap{padding:.8rem}
+.wave-canvas{width:100%;height:40px;display:block}
+@keyframes syncPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+@keyframes scanRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes logFade{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+@keyframes alertFlash{0%{opacity:0}50%,100%{opacity:1}}
+@keyframes critPulse{0%,100%{box-shadow:0 0 0 rgba(255,51,85,0)}50%{box-shadow:0 0 12px rgba(255,51,85,.3)}}
+@keyframes laserFlicker{0%,100%{opacity:.9}50%{opacity:.5}}
+.flicker{animation:laserFlicker .15s infinite}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">Oculus<span>Twin</span></div>
+    <div class="sys-badge">Digital Twin OS v4.2</div>
+    <div class="sys-badge" id="patientBadge">Patient: ID-7741 · Age: 58</div>
+  </div>
+  <div class="topbar-center">
+    <div class="sync-indicator"><div class="sync-dot"></div><span>TWIN SYNC ACTIVE</span></div>
+    <div class="sys-badge" id="clockBadge">--:--:--</div>
+  </div>
+  <div class="topbar-right">
+    <div class="top-stat"><span class="lbl">Sync Latency</span><span class="val" id="syncLatency">4ms</span></div>
+    <div class="top-stat"><span class="lbl">Twin Fidelity</span><span class="val" id="twinFidelity">99.3%</span></div>
+    <div class="top-stat"><span class="lbl">Status</span><span class="val" id="topStatus" style="color:var(--teal)">READY</span></div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <div class="panel-block">
+      <div class="panel-title">Surgery Type</div>
+      <button class="surg-btn active" onclick="selectSurgery(0,this)">Phacoemulsification<br><span style="color:var(--muted);font-size:.55rem">Cataract Removal</span></button>
+      <button class="surg-btn" onclick="selectSurgery(1,this)">LASIK<br><span style="color:var(--muted);font-size:.55rem">Refractive Correction</span></button>
+      <button class="surg-btn" onclick="selectSurgery(2,this)">Vitrectomy<br><span style="color:var(--muted);font-size:.55rem">Retinal Repair</span></button>
+    </div>
+    <div class="panel-block grow">
+      <div class="panel-title">Live Vitals</div>
+      <div id="vitalsContainer"></div>
+    </div>
+    <div class="panel-block">
+      <div class="panel-title">Procedure Phases</div>
+      <div id="phaseList"></div>
+    </div>
+  </div>
+
+  <!-- CENTER STAGE -->
+  <div class="center-stage">
+    <div class="phase-progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-label" id="progressLabel">0% — SELECT SURGERY TO BEGIN</div>
+    </div>
+    <div class="eye-wrapper">
+      <div class="scan-ring"></div>
+      <div class="scan-ring"></div>
+      <div class="scan-ring"></div>
+      <div class="measure-line m-h"></div>
+      <div class="measure-line m-v"></div>
+      <div class="measure-label" style="top:48%;left:11%;transform:translateY(-50%)">← 24.1 mm →</div>
+      <div class="measure-label" style="left:52%;top:10%">↕ 23.7mm</div>
+      <div id="laserBeam" class="laser-beam" style="width:2px;height:0px;left:50%;top:35%;transform:translateX(-50%)"></div>
+      <svg id="eyeSvg" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="sclGrad" cx="50%" cy="45%"><stop offset="0%" stop-color="#e8e0d0"/><stop offset="100%" stop-color="#c8b898"/></radialGradient>
+          <radialGradient id="corneaGrad" cx="50%" cy="30%"><stop offset="0%" stop-color="rgba(180,240,255,0.5)"/><stop offset="100%" stop-color="rgba(100,180,220,0.2)"/></radialGradient>
+          <radialGradient id="irisGrad" cx="50%" cy="40%"><stop offset="0%" stop-color="#3a5e2a"/><stop offset="40%" stop-color="#2a7040"/><stop offset="100%" stop-color="#1a3a20"/></radialGradient>
+          <radialGradient id="retinaGrad" cx="50%" cy="50%"><stop offset="0%" stop-color="#8a1a1a"/><stop offset="100%" stop-color="#4a0a0a"/></radialGradient>
+          <radialGradient id="lensGrad" cx="50%" cy="35%"><stop offset="0%" stop-color="rgba(220,230,240,0.85)"/><stop offset="100%" stop-color="rgba(160,180,200,0.4)"/></radialGradient>
+          <filter id="glow"><feGaussianBlur stdDeviation="2" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <ellipse id="sclera" cx="160" cy="160" rx="128" ry="128" fill="url(#sclGrad)" stroke="#b8a888" stroke-width="0.5"/>
+        <ellipse cx="160" cy="160" rx="112" ry="112" fill="#6a1010" opacity="0.5"/>
+        <ellipse id="retina" cx="160" cy="160" rx="108" ry="108" fill="url(#retinaGrad)" stroke="#8a2020" stroke-width="0.5"/>
+        <ellipse id="vitreous" cx="160" cy="158" rx="90" ry="90" fill="rgba(200,220,240,0.15)" stroke="rgba(180,220,255,0.2)" stroke-width="0.5"/>
+        <ellipse cx="160" cy="160" rx="90" ry="90" fill="none" stroke="#5a3a10" stroke-width="4" opacity="0.7"/>
+        <circle id="opticNerve" cx="190" cy="162" r="13" fill="#3a0808" stroke="#6a1818" stroke-width="0.5"/>
+        <circle cx="190" cy="162" r="7" fill="#5a1010"/>
+        <circle cx="187" cy="160" r="3" fill="#8a2020" opacity="0.7"/>
+        <text x="190" y="185" text-anchor="middle" fill="#4a1010" font-size="6" font-family="monospace" opacity="0.8">FOVEA</text>
+        <circle id="macula" cx="148" cy="162" r="8" fill="#6a1818" stroke="#8a2828" stroke-width="0.5" opacity="0.8"/>
+        <g id="bloodVessels" opacity="0.6">
+          <path d="M 190 162 Q 170 145 145 135 Q 130 128 115 132" stroke="#cc3333" stroke-width="1.5" fill="none"/>
+          <path d="M 190 162 Q 175 178 155 185 Q 138 190 125 182" stroke="#cc3333" stroke-width="1.5" fill="none"/>
+          <path d="M 190 162 Q 205 150 218 142 Q 228 136 232 130" stroke="#cc3333" stroke-width="1.2" fill="none"/>
+          <path d="M 190 162 Q 208 172 218 183 Q 225 192 228 198" stroke="#cc3333" stroke-width="1.2" fill="none"/>
+          <path d="M 145 135 Q 138 128 128 125 Q 120 122 112 125" stroke="#cc3333" stroke-width="0.8" fill="none"/>
+          <path d="M 155 185 Q 148 192 140 196 Q 132 200 125 198" stroke="#cc3333" stroke-width="0.8" fill="none"/>
+        </g>
+        <ellipse id="lens" cx="160" cy="156" rx="28" ry="22" fill="url(#lensGrad)" stroke="rgba(200,220,240,0.5)" stroke-width="0.8"/>
+        <ellipse cx="160" cy="153" rx="16" ry="8" fill="rgba(240,248,255,0.3)"/>
+        <g id="zonules" opacity="0.35" stroke="#8a9aa0" stroke-width="0.5">
+          <line x1="160" y1="134" x2="160" y2="122"/><line x1="168" y1="136" x2="174" y2="124"/>
+          <line x1="152" y1="136" x2="146" y2="124"/><line x1="175" y1="144" x2="182" y2="135"/>
+          <line x1="145" y1="144" x2="138" y2="135"/><line x1="160" y1="178" x2="160" y2="190"/>
+          <line x1="168" y1="176" x2="174" y2="188"/><line x1="152" y1="176" x2="146" y2="188"/>
+          <line x1="175" y1="168" x2="182" y2="178"/><line x1="145" y1="168" x2="138" y2="178"/>
+        </g>
+        <circle id="iris" cx="160" cy="156" r="52" fill="url(#irisGrad)"/>
+        <g opacity="0.3" stroke="#5a9060" stroke-width="0.5">
+          <line x1="108" y1="156" x2="212" y2="156"/><line x1="120" y1="130" x2="200" y2="182"/><line x1="120" y1="182" x2="200" y2="130"/>
+        </g>
+        <g id="irisLines" opacity="0.2" stroke="#7ab080" stroke-width="0.5">
+          <line x1="160" y1="104" x2="160" y2="120"/><line x1="188" y1="110" x2="182" y2="125"/>
+          <line x1="208" y1="130" x2="196" y2="140"/><line x1="212" y1="156" x2="196" y2="156"/>
+          <line x1="208" y1="182" x2="196" y2="170"/><line x1="188" y1="202" x2="182" y2="187"/>
+          <line x1="160" y1="208" x2="160" y2="192"/><line x1="132" y1="202" x2="138" y2="187"/>
+          <line x1="112" y1="182" x2="124" y2="170"/><line x1="108" y1="156" x2="124" y2="156"/>
+          <line x1="112" y1="130" x2="124" y2="140"/><line x1="132" y1="110" x2="138" y2="125"/>
+        </g>
+        <circle id="pupil" cx="160" cy="156" r="28" fill="#050810"/>
+        <ellipse cx="150" cy="148" rx="5" ry="3" fill="rgba(255,255,255,0.15)" transform="rotate(-20,150,148)"/>
+        <ellipse cx="160" cy="126" rx="54" ry="20" fill="rgba(180,230,255,0.08)" stroke="rgba(180,230,255,0.1)" stroke-width="0.3"/>
+        <ellipse id="cornea" cx="160" cy="104" rx="56" ry="28" fill="url(#corneaGrad)" stroke="rgba(200,240,255,0.6)" stroke-width="0.8"/>
+        <ellipse cx="160" cy="100" rx="30" ry="12" fill="rgba(220,248,255,0.2)"/>
+        <path id="eyelidTop" d="M 32 120 Q 160 52 288 120" stroke="#c8a888" stroke-width="2.5" fill="none"/>
+        <path id="eyelidBottom" d="M 52 205 Q 160 258 268 205" stroke="#c8a888" stroke-width="2" fill="none"/>
+        <g stroke="#4a3020" stroke-width="1.2" opacity="0.7">
+          <line x1="70" y1="108" x2="62" y2="98"/><line x1="90" y1="97" x2="86" y2="86"/>
+          <line x1="112" y1="89" x2="110" y2="78"/><line x1="134" y1="85" x2="134" y2="74"/>
+          <line x1="157" y1="83" x2="158" y2="72"/><line x1="180" y1="85" x2="182" y2="74"/>
+          <line x1="202" y1="90" x2="206" y2="80"/><line x1="222" y1="98" x2="228" y2="89"/>
+          <line x1="240" y1="108" x2="248" y2="100"/>
+        </g>
+        <g id="scanOverlay" opacity="0">
+          <rect x="90" y="90" width="140" height="140" fill="none" stroke="rgba(0,229,255,0.3)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <path d="M90,90 L90,105 M90,90 L105,90" stroke="#00e5ff" stroke-width="1.5" fill="none"/>
+          <path d="M230,90 L230,105 M230,90 L215,90" stroke="#00e5ff" stroke-width="1.5" fill="none"/>
+          <path d="M90,230 L90,215 M90,230 L105,230" stroke="#00e5ff" stroke-width="1.5" fill="none"/>
+          <path d="M230,230 L230,215 M230,230 L215,230" stroke="#00e5ff" stroke-width="1.5" fill="none"/>
+          <line x1="157" y1="148" x2="163" y2="148" stroke="#00e5ff" stroke-width="0.8"/>
+          <line x1="160" y1="145" x2="160" y2="151" stroke="#00e5ff" stroke-width="0.8"/>
+        </g>
+        <ellipse id="iolHighlight" cx="160" cy="156" rx="28" ry="22" fill="none" stroke="#00e5ff" stroke-width="1.5" opacity="0" filter="url(#glow)"/>
+        <g id="probeGroup" opacity="0">
+          <line x1="220" y1="80" x2="175" y2="160" stroke="#ffb800" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <circle cx="175" cy="160" r="4" fill="#ffb800" opacity="0.8"/>
+          <text x="225" y="78" fill="#ffb800" font-size="7" font-family="monospace">PROBE</text>
+        </g>
+        <ellipse id="retinaHighlight" cx="160" cy="160" rx="108" ry="108" fill="none" stroke="#00ffc8" stroke-width="1" opacity="0" stroke-dasharray="6,3"/>
+      </svg>
+    </div>
+    <div class="stage-info">
+      <div class="phase-name" id="currentPhaseName">SELECT A SURGERY TYPE</div>
+      <div class="phase-desc" id="currentPhaseDesc">Choose a procedure from the left panel to begin simulation</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-block waveform-wrap" style="flex-shrink:0">
+      <div class="panel-title">IOP Waveform — Intraocular Pressure</div>
+      <canvas id="waveCanvas" class="wave-canvas" width="220" height="45"></canvas>
+    </div>
+    <div class="panel-block" style="flex-shrink:0">
+      <div class="panel-title">Anomaly Detection</div>
+      <div id="alertWarn" class="alert-box warn">
+        <div class="alert-icon">⚠</div>
+        <div><div class="alert-title">IOP ELEVATION</div><div class="alert-msg" id="alertWarnMsg">Intraocular pressure rising above threshold</div></div>
+      </div>
+      <div id="alertCrit" class="alert-box crit">
+        <div class="alert-icon">⬛</div>
+        <div><div class="alert-title">CRITICAL ALERT</div><div class="alert-msg" id="alertCritMsg">Immediate surgical review required</div></div>
+      </div>
+      <div id="alertOk" class="alert-box" style="border-left:2px solid var(--green);background:rgba(0,232,122,0.05)">
+        <div class="alert-icon" style="color:var(--green)">✓</div>
+        <div><div class="alert-title" style="color:var(--green)">ALL SYSTEMS NOMINAL</div><div class="alert-msg">Twin sync stable · No anomalies detected</div></div>
+      </div>
+    </div>
+    <div class="panel-block" style="flex-shrink:0"><div class="panel-title">Event Log</div></div>
+    <div class="event-log" id="eventLog"></div>
+  </div>
+
+  <!-- CONTROLS BAR -->
+  <div class="controls-bar">
+    <div class="ctrl-row">
+      <button class="ctrl-btn primary" id="btnStart" onclick="startOperation()">▶ START SIMULATION</button>
+      <button class="ctrl-btn" id="btnNext" onclick="nextPhase()" disabled>NEXT PHASE ▶</button>
+      <button class="ctrl-btn" id="btnPause" onclick="togglePause()" disabled>⏸ PAUSE</button>
+      <button class="ctrl-btn danger" id="btnReset" onclick="resetOperation()">↺ RESET</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem">
+        <span class="ctrl-label">Speed</span>
+        <div class="speed-btns">
+          <button class="speed-btn" onclick="setSpeed(0.5,this)">0.5×</button>
+          <button class="speed-btn active" onclick="setSpeed(1,this)">1×</button>
+          <button class="speed-btn" onclick="setSpeed(2,this)">2×</button>
+          <button class="speed-btn" onclick="setSpeed(4,this)">4×</button>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-row" style="gap:1.5rem">
+      <div><span class="ctrl-label">Mode</span> <span style="color:var(--cyan);font-size:.7rem">AUTO-ADVANCE</span></div>
+      <div><span class="ctrl-label">Elapsed</span> <span style="color:var(--text);font-size:.7rem" id="elapsedTime">00:00:00</span></div>
+      <div><span class="ctrl-label">Phase</span> <span style="color:var(--text);font-size:.7rem" id="phaseProgress">—</span></div>
+      <div><span class="ctrl-label">Anomalies</span> <span style="font-size:.7rem" id="anomalyCount">0</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SURGERIES=[{name:"Phacoemulsification",short:"Cataract Removal",phases:[{name:"Pre-Op Assessment",desc:"Twin calibration · biometry scan · IOP baseline",duration:8000,vitals:{iop:[14,16],cct:[542,548],pupil:[7.5,8.0],perfusion:[85,90],aqFlow:[2.2,2.4],temp:[35.2,35.4]},actions:["twin_calibrate","scan_cornea","iop_baseline","pupil_dilation"],eyeState:"normal"},{name:"Corneal Incision",desc:"2.4mm temporal clear cornea incision",duration:6000,vitals:{iop:[8,12],cct:[520,535],pupil:[7.8,8.0],perfusion:[82,86],aqFlow:[1.8,2.0],temp:[35.0,35.3]},actions:["incision_start","aq_outflow","probe_incision","viscoelastic_inject"],eyeState:"incision"},{name:"Phacoemulsification",desc:"Ultrasonic lens fragmentation & aspiration",duration:10000,vitals:{iop:[22,28],cct:[530,545],pupil:[7.5,7.8],perfusion:[78,84],aqFlow:[1.2,1.8],temp:[35.5,36.2]},actions:["us_energy_on","lens_fragment","aspirate_cortex","iop_spike_warn"],eyeState:"phaco"},{name:"IOL Insertion",desc:"Foldable intraocular lens deployment +21.0D",duration:7000,vitals:{iop:[14,18],cct:[535,542],pupil:[7.2,7.5],perfusion:[83,88],aqFlow:[2.0,2.2],temp:[35.2,35.5]},actions:["iol_cartridge","iol_inject","iol_unfold","iol_position"],eyeState:"iol"},{name:"Closure & Hydration",desc:"Wound hydration · BSS irrigation · IOP normalise",duration:6000,vitals:{iop:[15,17],cct:[542,550],pupil:[6.8,7.0],perfusion:[85,89],aqFlow:[2.2,2.3],temp:[35.0,35.2]},actions:["bss_hydration","wound_seal","iop_check","twin_post_record"],eyeState:"closure"}]},{name:"LASIK",short:"Refractive Correction",phases:[{name:"Pre-Op Mapping",desc:"Corneal topography · wavefront aberrometry · pachymetry",duration:8000,vitals:{iop:[13,15],cct:[554,562],pupil:[6.8,7.2],perfusion:[87,92],aqFlow:[2.3,2.5],temp:[35.1,35.3]},actions:["topo_scan","aberrometry","pachymetry","twin_map"],eyeState:"normal"},{name:"Suction & Docking",desc:"Microkeratome suction ring placement · IOP elevation",duration:5000,vitals:{iop:[55,70],cct:[548,558],pupil:[5.5,6.0],perfusion:[60,70],aqFlow:[0.8,1.2],temp:[35.3,35.6]},actions:["suction_ring","iop_elevate","cornea_lock","suction_confirm"],eyeState:"suction"},{name:"Flap Creation",desc:"Femtosecond laser corneal flap 110μm depth",duration:7000,vitals:{iop:[45,55],cct:[440,455],pupil:[5.8,6.2],perfusion:[65,72],aqFlow:[0.6,1.0],temp:[35.4,35.8]},actions:["fs_laser_on","flap_cut","flap_lift","stromal_expose"],eyeState:"flap"},{name:"Excimer Ablation",desc:"193nm UV ablation · −4.25D correction · 45s",duration:9000,vitals:{iop:[12,14],cct:[395,410],pupil:[7.0,7.2],perfusion:[82,88],aqFlow:[2.0,2.2],temp:[35.2,35.5]},actions:["excimer_on","ablation_track","eye_tracking","ablation_complete"],eyeState:"laser"},{name:"Flap Reposition",desc:"Flap alignment · BSS irrigation · adherence check",duration:6000,vitals:{iop:[14,16],cct:[508,515],pupil:[6.8,7.0],perfusion:[86,90],aqFlow:[2.2,2.4],temp:[35.0,35.2]},actions:["flap_reposition","bss_irrigate","align_check","twin_post_record"],eyeState:"closure"}]},{name:"Pars Plana Vitrectomy",short:"Retinal Repair",phases:[{name:"Pre-Op Imaging",desc:"OCT · fundus imaging · retinal mapping twin sync",duration:8000,vitals:{iop:[14,16],cct:[540,548],pupil:[8.0,8.5],perfusion:[84,89],aqFlow:[2.1,2.3],temp:[35.1,35.4]},actions:["oct_scan","fundus_image","retina_map","twin_3d_build"],eyeState:"normal"},{name:"Port Insertion",desc:"23g pars plana trocar · 3-port setup · ILM probe",duration:7000,vitals:{iop:[18,22],cct:[540,546],pupil:[8.2,8.5],perfusion:[78,84],aqFlow:[1.5,1.8],temp:[35.2,35.5]},actions:["trocar_insert","infusion_cannula","light_probe","vitrector_port"],eyeState:"ports"},{name:"Core Vitrectomy",desc:"Vitreous gel removal · 5000 cpm · posterior hyaloid",duration:12000,vitals:{iop:[22,26],cct:[540,548],pupil:[8.0,8.3],perfusion:[72,80],aqFlow:[0.4,0.8],temp:[35.3,35.7]},actions:["vitrector_on","core_vitreous","pvd_induce","posterior_hyaloid"],eyeState:"vitrectomy"},{name:"Retinal Repair",desc:"Endolaser photocoagulation · retinal tear sealing",duration:9000,vitals:{iop:[20,24],cct:[540,546],pupil:[7.8,8.0],perfusion:[68,76],aqFlow:[0.3,0.6],temp:[35.5,36.0]},actions:["endolaser_on","tear_seal","tamponade_inject","retina_flatten"],eyeState:"laser"},{name:"Tamponade & Close",desc:"Gas/oil tamponade · port removal · IOP normalise",duration:7000,vitals:{iop:[15,18],cct:[540,548],pupil:[7.5,7.8],perfusion:[80,86],aqFlow:[1.8,2.2],temp:[35.1,35.4]},actions:["tamponade_fill","port_remove","conjunctiva_close","twin_post_record"],eyeState:"closure"}]}];
+const ACTION_MESSAGES={twin_calibrate:{text:"Digital twin calibration initiated",type:"sync"},scan_cornea:{text:"Corneal topography scan: 72,450 data points",type:"info"},iop_baseline:{text:"IOP baseline recorded: 14.2 mmHg",type:"ok"},pupil_dilation:{text:"Pharmacologic mydriasis: pupil 8.0mm",type:"info"},twin_map:{text:"Twin wavefront map built: 8,192 Zernike modes",type:"sync"},twin_3d_build:{text:"Retinal 3D mesh generated: 0.2μm resolution",type:"sync"},twin_post_record:{text:"Post-op state recorded to digital twin archive",type:"sync"},incision_start:{text:"Keratome entry: 2.4mm temporal clear cornea",type:"info"},aq_outflow:{text:"Aqueous outflow detected — IOP drop 6 mmHg",type:"warn"},probe_incision:{text:"Paracentesis port established at 10 o'clock",type:"info"},viscoelastic_inject:{text:"OVD injected — anterior chamber maintained",type:"ok"},us_energy_on:{text:"Phaco handpiece: 40kHz · 60% power · torsional mode",type:"info"},lens_fragment:{text:"Nucleus fragmentation in progress — 4 quadrant chop",type:"info"},aspirate_cortex:{text:"Cortical aspiration: I/A handpiece 25mmHg",type:"info"},iop_spike_warn:{text:"⚠ IOP spike 26 mmHg — monitoring",type:"warn"},iol_cartridge:{text:"IOL loaded: AcrySof IQ +21.0D aspheric",type:"info"},iol_inject:{text:"IOL injecting through 2.4mm wound",type:"info"},iol_unfold:{text:"IOL unfolding in capsular bag — twin confirms position",type:"sync"},iol_position:{text:"IOL centred: pupil centration 0.12mm — OPTIMAL",type:"ok"},bss_hydration:{text:"Wound hydration complete — watertight seal confirmed",type:"ok"},wound_seal:{text:"Self-sealing architecture verified by twin model",type:"sync"},iop_check:{text:"Final IOP: 16.2 mmHg — within normal range",type:"ok"},topo_scan:{text:"Corneal topography: 25,600 points acquired",type:"info"},aberrometry:{text:"Wavefront aberrometry: RMS 0.42μm · HOA 0.18μm",type:"info"},pachymetry:{text:"Central corneal thickness: 558μm — adequate for ablation",type:"ok"},suction_ring:{text:"Suction ring seated — negative pressure applied",type:"info"},iop_elevate:{text:"⚠ IOP elevated: 65 mmHg (suction artifact — expected)",type:"warn"},cornea_lock:{text:"Cornea immobilised — microkeratome docked",type:"info"},suction_confirm:{text:"Suction loss threshold monitor: ACTIVE",type:"ok"},fs_laser_on:{text:"Femtosecond laser: 150nJ · 7.8mm flap diameter",type:"info"},flap_cut:{text:"Flap creation: 110μm depth · raster pattern complete",type:"info"},flap_lift:{text:"Flap lifted and reflected — stroma exposed",type:"info"},stromal_expose:{text:"Residual stromal bed: 368μm — safe for ablation",type:"ok"},excimer_on:{text:"Excimer laser armed: 193nm · 95Hz · eye tracker locked",type:"info"},ablation_track:{text:"Active eye tracking: 1000Hz latency <1ms",type:"sync"},eye_tracking:{text:"Ablation 60% complete — pattern nominal",type:"info"},ablation_complete:{text:"Ablation complete: −4.25D · 45.2s · 67μm tissue removed",type:"ok"},flap_reposition:{text:"Flap repositioned — edge aligned under slit lamp",type:"info"},bss_irrigate:{text:"Sub-flap irrigation — interface debris cleared",type:"info"},align_check:{text:"Flap striae test: NEGATIVE — adherence confirmed",type:"ok"},oct_scan:{text:"OCT B-scan: retinal layers segmented — 512 A-scans",type:"info"},fundus_image:{text:"Fundus imaging: temporal horseshoe tear identified",type:"warn"},retina_map:{text:"Retinal thickness map: macular oedema 0.24mm",type:"warn"},trocar_insert:{text:"23g trocar at 3.5mm posterior limbus — 3 ports set",type:"info"},infusion_cannula:{text:"Infusion cannula confirmed intraocular — BSS flow on",type:"ok"},light_probe:{text:"Endoilluminator: 3000K chandelier light active",type:"info"},vitrector_port:{text:"Vitrector inserted — 23g ALCON CONSTELLATION",type:"info"},vitrector_on:{text:"Vitrector: 5000 cpm · 0.04cc cut speed · vacuum 350mmHg",type:"info"},core_vitreous:{text:"Core vitrectomy in progress — gel clearance 40%",type:"info"},pvd_induce:{text:"Posterior vitreous detachment induced — posterior hyaloid elevated",type:"info"},posterior_hyaloid:{text:"Complete PVD confirmed — twin retinal surface clear",type:"ok"},endolaser_on:{text:"Endolaser: 532nm · 200mW · 200ms · 8 spot rows",type:"info"},tear_seal:{text:"Laser photocoagulation: 3 rows surrounding horseshoe tear",type:"info"},tamponade_inject:{text:"20% SF6 gas tamponade injecting — fill 90%",type:"info"},retina_flatten:{text:"Retina flat — twin confirms reattachment geometry",type:"sync"},tamponade_fill:{text:"Gas fill complete: 90% — PFCL exchange complete",type:"ok"},port_remove:{text:"Trocars removed — sclerotomies self-sealing confirmed",type:"info"},conjunctiva_close:{text:"Conjunctival peritomy closed — 8-0 vicryl × 3",type:"info"}};
+const VITALS_DEF=[{key:'iop',name:'IOP',unit:'mmHg',normal:[8,21],warn:[22,30]},{key:'cct',name:'CCT',unit:'μm',normal:[490,600],warn:[400,489]},{key:'pupil',name:'Pupil Ø',unit:'mm',normal:[3,8.5],warn:[1.5,2.9]},{key:'perfusion',name:'Retinal Perf.',unit:'%',normal:[80,100],warn:[60,79]},{key:'aqFlow',name:'Aqueous Flow',unit:'μL/min',normal:[1.5,3.0],warn:[0.5,1.4]},{key:'temp',name:'Ocular Temp.',unit:'°C',normal:[34.5,36.5],warn:[36.6,37.5]}];
+let selectedSurgery=0,currentPhase=-1,running=false,paused=false,speed=1,phaseTimer=null,elapsedMs=0,elapsedTimer=null,vitalTimers=[],anomalyCount=0,waveData=[],waveCtx=null,iopTarget=14;
+let currentVitals={iop:14.5,cct:545,pupil:7.8,perfusion:87,aqFlow:2.3,temp:35.2};
+
+window.onload=()=>{
+  const canvas=document.getElementById('waveCanvas');
+  waveCtx=canvas.getContext('2d');
+  waveData=new Array(110).fill(15);
+  renderVitals();renderPhaseList();updateAlerts('idle');
+  tickClock();setInterval(tickClock,1000);setInterval(updateWaveform,60);setInterval(jitterFidelity,2000);
+  addLog("Digital Twin OS v4.2 initialised","sync");
+  addLog("Patient ID-7741 loaded — biometry synced","info");
+  addLog("Awaiting surgery selection...","info");
+};
+
+function tickClock(){document.getElementById('clockBadge').textContent=new Date().toTimeString().slice(0,8);}
+function jitterFidelity(){document.getElementById('twinFidelity').textContent=(98.5+Math.random()*1.2).toFixed(1)+'%';document.getElementById('syncLatency').textContent=Math.floor(3+Math.random()*5)+'ms';}
+
+function renderVitals(){
+  const c=document.getElementById('vitalsContainer');c.innerHTML='';
+  VITALS_DEF.forEach(d=>{
+    const v=currentVitals[d.key],{color,status,pct}=getVitalStatus(d,v);
+    c.innerHTML+=`<div class="vital"><div class="vital-header"><span class="vital-name">${d.name}</span><span class="vital-val" id="vval-${d.key}">${fmtVal(v,d.key)} <span class="vital-unit">${d.unit}</span></span></div><div class="vital-bar-bg"><div class="vital-bar" id="vbar-${d.key}" style="width:${pct}%;background:${color}"></div></div><div class="vital-status" id="vstat-${d.key}" style="color:${color}">${status}</div></div>`;
+  });
+}
+function fmtVal(v,k){return(['iop','cct','perfusion'].includes(k))?Math.round(v):v.toFixed(1);}
+function getVitalStatus(d,val){
+  const[nLo,nHi]=d.normal,[wLo,wHi]=d.warn;
+  let color,status;
+  if(val>=nLo&&val<=nHi){color='#00e87a';status='● NORMAL';}
+  else if((val>=wLo&&val<nLo)||(val>nHi&&val<=wHi)){color='#ffb800';status='▲ CAUTION';}
+  else{color='#ff3355';status='■ CRITICAL';}
+  const ranges={iop:[5,80],cct:[350,620],pupil:[0,10],perfusion:[40,100],aqFlow:[0,3],temp:[33,38]};
+  const[rLo,rHi]=ranges[d.key]||[0,100];
+  const pct=Math.min(100,Math.max(0,(val-rLo)/(rHi-rLo)*100));
+  return{color,status,pct};
+}
+function updateVitalDisplay(){
+  VITALS_DEF.forEach(d=>{
+    const v=currentVitals[d.key],{color,status,pct}=getVitalStatus(d,v);
+    const el=document.getElementById('vval-'+d.key);if(el)el.innerHTML=`${fmtVal(v,d.key)} <span class="vital-unit">${d.unit}</span>`;
+    const bar=document.getElementById('vbar-'+d.key);if(bar){bar.style.width=pct+'%';bar.style.background=color;}
+    const st=document.getElementById('vstat-'+d.key);if(st){st.textContent=status;st.style.color=color;}
+  });
+}
+
+function selectSurgery(idx,el){
+  if(running)return;
+  selectedSurgery=idx;
+  document.querySelectorAll('.surg-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');currentPhase=-1;renderPhaseList();
+  document.getElementById('currentPhaseName').textContent=SURGERIES[idx].name.toUpperCase();
+  document.getElementById('currentPhaseDesc').textContent=SURGERIES[idx].short+' — Ready to begin simulation';
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressLabel').textContent='0% — PRESS START';
+  resetEyeState();addLog('Surgery selected: '+SURGERIES[idx].name,'sync');
+}
+function renderPhaseList(){
+  const surg=SURGERIES[selectedSurgery],c=document.getElementById('phaseList');c.innerHTML='';
+  surg.phases.forEach((ph,i)=>{
+    const s=i<currentPhase?'done':i===currentPhase?'active':'';
+    c.innerHTML+=`<div class="phase-item ${s}"><div class="phase-dot"></div><span>${ph.name}</span><span class="phase-num">${String(i+1).padStart(2,'0')}</span></div>`;
+  });
+}
+function startOperation(){
+  if(running)return;running=true;paused=false;currentPhase=0;elapsedMs=0;
+  document.getElementById('btnStart').disabled=true;document.getElementById('btnNext').disabled=false;document.getElementById('btnPause').disabled=false;
+  document.getElementById('topStatus').textContent='OPERATING';document.getElementById('topStatus').style.color='#00e5ff';
+  startElapsed();runPhase();addLog('⬛ SIMULATION STARTED — '+SURGERIES[selectedSurgery].name,'sync');
+}
+function runPhase(){
+  const surg=SURGERIES[selectedSurgery];if(currentPhase>=surg.phases.length){endOperation();return;}
+  const ph=surg.phases[currentPhase];
+  renderPhaseList();
+  document.getElementById('currentPhaseName').textContent=ph.name;
+  document.getElementById('currentPhaseDesc').textContent=ph.desc;
+  const tot=surg.phases.length,pct=(currentPhase/tot)*100;
+  document.getElementById('progressFill').style.width=pct+'%';
+  document.getElementById('progressLabel').textContent=Math.round(pct)+'% — Phase '+(currentPhase+1)+' of '+tot;
+  document.getElementById('phaseProgress').textContent='Phase '+(currentPhase+1)+'/'+tot;
+  applyEyeState(ph.eyeState,ph.vitals);
+  const dur=ph.duration/speed;
+  ph.actions.forEach((a,i)=>{
+    setTimeout(()=>{if(!running||paused)return;const m=ACTION_MESSAGES[a];if(m){addLog(m.text,m.type);checkAnomaly(m.type);}},( i+1)*(dur/(ph.actions.length+1)));
+  });
+  startVitalAnimation(dur,ph.vitals);
+  iopTarget=(ph.vitals.iop[0]+ph.vitals.iop[1])/2;
+  const avgIop=(ph.vitals.iop[0]+ph.vitals.iop[1])/2;
+  if(avgIop>30)updateAlerts('crit','IOP critically elevated: '+Math.round(avgIop)+' mmHg');
+  else if(avgIop>21)updateAlerts('warn','IOP above normal: '+Math.round(avgIop)+' mmHg — monitoring');
+  else updateAlerts('ok');
+  phaseTimer=setTimeout(()=>{if(running&&!paused)nextPhase();},dur);
+}
+function nextPhase(){clearTimeout(phaseTimer);clearVitalTimers();currentPhase++;if(currentPhase>=SURGERIES[selectedSurgery].phases.length){endOperation();return;}runPhase();}
+function togglePause(){
+  paused=!paused;document.getElementById('btnPause').textContent=paused?'▶ RESUME':'⏸ PAUSE';
+  if(paused){clearTimeout(phaseTimer);clearVitalTimers();stopElapsed();addLog('Simulation paused','warn');}
+  else{runPhase();startElapsed();addLog('Simulation resumed','info');}
+}
+function resetOperation(){
+  running=false;paused=false;currentPhase=-1;clearTimeout(phaseTimer);clearVitalTimers();stopElapsed();
+  elapsedMs=0;anomalyCount=0;
+  document.getElementById('elapsedTime').textContent='00:00:00';document.getElementById('anomalyCount').textContent='0';document.getElementById('anomalyCount').style.color='#d4e8f5';
+  document.getElementById('btnStart').disabled=false;document.getElementById('btnNext').disabled=true;document.getElementById('btnPause').disabled=true;document.getElementById('btnPause').textContent='⏸ PAUSE';
+  document.getElementById('topStatus').textContent='READY';document.getElementById('topStatus').style.color='#00ffc8';
+  document.getElementById('currentPhaseName').textContent='RESET — SELECT SURGERY';
+  document.getElementById('currentPhaseDesc').textContent='Operation reset. Ready for new simulation.';
+  document.getElementById('progressFill').style.width='0%';document.getElementById('progressLabel').textContent='0% — PRESS START';document.getElementById('phaseProgress').textContent='—';
+  currentVitals={iop:14.5,cct:545,pupil:7.8,perfusion:87,aqFlow:2.3,temp:35.2};
+  updateVitalDisplay();renderPhaseList();resetEyeState();updateAlerts('idle');addLog('System reset. Ready for new simulation.','sync');
+}
+function endOperation(){
+  running=false;stopElapsed();
+  const surg=SURGERIES[selectedSurgery];
+  document.getElementById('currentPhaseName').textContent='PROCEDURE COMPLETE';
+  document.getElementById('currentPhaseDesc').textContent=surg.name+' — all phases completed successfully';
+  document.getElementById('progressFill').style.width='100%';document.getElementById('progressLabel').textContent='100% — COMPLETE';
+  document.getElementById('topStatus').textContent='COMPLETE';document.getElementById('topStatus').style.color='#00e87a';
+  document.getElementById('btnNext').disabled=true;document.getElementById('btnPause').disabled=true;
+  updateAlerts('ok');renderPhaseList();addLog('✓ Surgery complete — twin post-op state archived','ok');
+  addLog('Total anomalies detected: '+anomalyCount,anomalyCount>2?'warn':'ok');
+}
+function setSpeed(s,btn){speed=s;document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+
+function startVitalAnimation(dur,phVitals){
+  clearVitalTimers();const steps=40,interval=dur/steps;let step=0;
+  const startVals={...currentVitals},endVals={};
+  Object.keys(phVitals).forEach(k=>{const[lo,hi]=phVitals[k];endVals[k]=lo+Math.random()*(hi-lo);});
+  const t=setInterval(()=>{
+    step++;const progress=step/steps;const ease=progress<.5?2*progress*progress:-1+(4-2*progress)*progress;
+    const jitter={iop:.5,cct:1,pupil:.05,perfusion:.5,aqFlow:.05,temp:.05};
+    Object.keys(endVals).forEach(k=>{currentVitals[k]=startVals[k]+(endVals[k]-startVals[k])*ease+(Math.random()-.5)*(jitter[k]||.1);});
+    updateVitalDisplay();if(step>=steps)clearInterval(t);
+  },interval);
+  vitalTimers.push(t);
+}
+function clearVitalTimers(){vitalTimers.forEach(t=>clearInterval(t));vitalTimers=[];}
+function startElapsed(){
+  stopElapsed();
+  elapsedTimer=setInterval(()=>{
+    elapsedMs+=1000;const h=Math.floor(elapsedMs/3600000),m=Math.floor((elapsedMs%3600000)/60000),s=Math.floor((elapsedMs%60000)/1000);
+    document.getElementById('elapsedTime').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  },1000);
+}
+function stopElapsed(){if(elapsedTimer){clearInterval(elapsedTimer);elapsedTimer=null;}}
+function addLog(text,type='info'){
+  const c=document.getElementById('eventLog'),time=new Date().toTimeString().slice(0,8);
+  const e=document.createElement('div');e.className='log-entry '+type;
+  e.innerHTML=`<span class="log-time">${time}</span><span class="log-text">${text}</span>`;
+  c.prepend(e);if(c.children.length>80)c.lastChild.remove();
+}
+function checkAnomaly(type){if(type==='warn'||type==='alert'){anomalyCount++;const el=document.getElementById('anomalyCount');el.textContent=anomalyCount;el.style.color=anomalyCount>3?'#ff3355':'#ffb800';}}
+function updateAlerts(state,msg){
+  document.getElementById('alertWarn').classList.remove('visible');
+  document.getElementById('alertCrit').classList.remove('visible');
+  document.getElementById('alertOk').style.display='none';
+  if(state==='warn'){document.getElementById('alertWarnMsg').textContent=msg||'Parameter outside normal range';document.getElementById('alertWarn').classList.add('visible');}
+  else if(state==='crit'){document.getElementById('alertCritMsg').textContent=msg||'Immediate review required';document.getElementById('alertCrit').classList.add('visible');}
+  else if(state==='ok'){document.getElementById('alertOk').style.display='flex';}
+}
+
+function updateWaveform(){
+  const canvas=document.getElementById('waveCanvas'),ctx=waveCtx,W=canvas.width,H=canvas.height;
+  waveData.push(currentVitals.iop+(Math.random()-.5)*2+Math.sin(Date.now()/300)*1.5);
+  if(waveData.length>110)waveData.shift();
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(15,32,53,1)';ctx.lineWidth=.5;
+  for(let y=0;y<H;y+=10){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  const minV=5,maxV=40,yHi=H-(21-minV)/(maxV-minV)*H,yLo=H-(8-minV)/(maxV-minV)*H;
+  ctx.fillStyle='rgba(0,232,122,0.05)';ctx.fillRect(0,yHi,W,yLo-yHi);
+  ctx.beginPath();
+  waveData.forEach((v,i)=>{const x=(i/(waveData.length-1))*W,y=H-(v-minV)/(maxV-minV)*H;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  const cur=waveData[waveData.length-1],wc=cur>30?'#ff3355':cur>21?'#ffb800':'#00ffc8';
+  ctx.strokeStyle=wc;ctx.lineWidth=1.5;ctx.shadowColor=wc;ctx.shadowBlur=4;ctx.stroke();ctx.shadowBlur=0;
+  ctx.fillStyle=wc;ctx.font='9px monospace';ctx.fillText(Math.round(cur)+' mmHg',W-52,10);
+}
+
+function resetEyeState(){
+  const g=id=>document.getElementById(id);
+  g('pupil')&&g('pupil').setAttribute('r','28');
+  g('iris')&&g('iris').setAttribute('r','52');g('iris')&&g('iris').setAttribute('fill','url(#irisGrad)');
+  g('lens')&&g('lens').setAttribute('opacity','1');
+  g('cornea')&&g('cornea').setAttribute('stroke','rgba(200,240,255,0.6)');g('cornea')&&g('cornea').setAttribute('stroke-width','0.8');g('cornea')&&g('cornea').setAttribute('opacity','1');
+  g('scanOverlay')&&g('scanOverlay').setAttribute('opacity','0');
+  g('iolHighlight')&&g('iolHighlight').setAttribute('opacity','0');
+  g('probeGroup')&&g('probeGroup').setAttribute('opacity','0');
+  g('retinaHighlight')&&g('retinaHighlight').setAttribute('opacity','0');
+  g('bloodVessels')&&g('bloodVessels').setAttribute('opacity','0.6');
+  g('vitreous')&&g('vitreous').setAttribute('opacity','1');
+  const lb=g('laserBeam');if(lb){lb.style.opacity='0';lb.style.height='0px';lb.classList.remove('flicker');}
+}
+function applyEyeState(state,vitals){
+  resetEyeState();const g=id=>document.getElementById(id);
+  const avgPupil=(vitals.pupil[0]+vitals.pupil[1])/2,pupilR=Math.round(10+(avgPupil/10)*24);
+  g('pupil').setAttribute('r',pupilR);g('scanOverlay').setAttribute('opacity','0.8');
+  switch(state){
+    case 'incision':g('cornea').setAttribute('stroke','rgba(255,184,0,0.8)');g('cornea').setAttribute('stroke-width','1.5');break;
+    case 'suction':g('cornea').setAttribute('stroke','rgba(255,184,0,0.9)');g('cornea').setAttribute('stroke-width','2');g('iris').setAttribute('fill','#2a4a30');g('pupil').setAttribute('r',Math.round(pupilR*.7));break;
+    case 'flap':g('cornea').setAttribute('stroke','rgba(255,184,0,0.9)');g('cornea').setAttribute('stroke-width','2');g('cornea').setAttribute('opacity','0.5');break;
+    case 'phaco':g('lens').setAttribute('opacity','0.2');g('iolHighlight').setAttribute('opacity','1');g('iolHighlight').setAttribute('stroke','#ffb800');break;
+    case 'laser':const lb=g('laserBeam');lb.style.opacity='0.9';lb.style.height='80px';lb.style.background='linear-gradient(to bottom,transparent,#00e5ff,rgba(0,229,255,0.2))';lb.classList.add('flicker');break;
+    case 'iol':g('lens').setAttribute('opacity','0');g('iolHighlight').setAttribute('opacity','1');g('iolHighlight').setAttribute('stroke','#00e5ff');break;
+    case 'ports':g('probeGroup').setAttribute('opacity','0.8');break;
+    case 'vitrectomy':g('probeGroup').setAttribute('opacity','1');g('vitreous').setAttribute('opacity','0.3');break;
+    case 'closure':g('cornea').setAttribute('stroke','rgba(0,232,122,0.6)');g('cornea').setAttribute('stroke-width','1.2');g('iolHighlight').setAttribute('opacity','0.5');g('iolHighlight').setAttribute('stroke','#00e87a');break;
+  }
+}
+</script>
+</body>
+</html>
